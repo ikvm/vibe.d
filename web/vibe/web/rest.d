@@ -470,7 +470,7 @@ HTTPServerRequestDelegate serveRestJSClient(I)(RestInterfaceSettings settings)
 	if (is(I == interface))
 {
 	import std.digest.md : md5Of;
-	import std.digest.digest : toHexString;
+	import std.digest : toHexString;
 	import std.array : appender;
 
 	auto app = appender!string();
@@ -505,6 +505,12 @@ HTTPServerRequestDelegate serveRestJSClient(I)(string base_url)
 	settings.baseURL = URL(base_url);
 	return serveRestJSClient!I(settings);
 }
+/// ditto
+HTTPServerRequestDelegate serveRestJSClient(I)()
+{
+	auto settings = new RestInterfaceSettings;
+	return serveRestJSClient!I(settings);
+}
 
 ///
 unittest {
@@ -524,6 +530,7 @@ unittest {
 		router.get("/myapi.js", serveRestJSClient!MyAPI(restsettings));
 		//router.get("/myapi.js", serveRestJSClient!MyAPI(URL("http://api.example.org/")));
 		//router.get("/myapi.js", serveRestJSClient!MyAPI("http://api.example.org/"));
+		//router.get("/myapi.js", serveRestJSClient!MyAPI()); // if want to request to self server
 		//router.get("/", staticTemplate!"index.dt");
 
 		listenHTTP(new HTTPServerSettings, router);
@@ -819,6 +826,10 @@ class RestInterfaceSettings {
 		ret.methodStyle = this.methodStyle;
 		ret.stripTrailingUnderscore = this.stripTrailingUnderscore;
 		ret.allowedOrigins = this.allowedOrigins.dup;
+		ret.errorHandler = this.errorHandler;
+		if (this.httpClientSettings) {
+			ret.httpClientSettings = this.httpClientSettings.dup;
+		}
 		return ret;
 	}
 }
@@ -1891,6 +1902,7 @@ private {
 	T fromRestString(T)(string value)
 	{
 		import std.conv : ConvException;
+		import std.uuid : UUID, UUIDParsingException;
 		import vibe.http.common : HTTPStatusException;
 		import vibe.http.status : HTTPStatus;
 		try {
@@ -1901,10 +1913,13 @@ private {
 			else static if (is(string : T)) return value;
 			else static if (__traits(compiles, T.fromISOExtString("hello"))) return T.fromISOExtString(value);
 			else static if (__traits(compiles, T.fromString("hello"))) return T.fromString(value);
+			else static if (is(T == UUID)) return UUID(value);
 			else return deserializeJson!T(parseJson(value));
 		} catch (ConvException e) {
 			throw new HTTPStatusException(HTTPStatus.badRequest, e.msg);
 		} catch (JSONException e) {
+			throw new HTTPStatusException(HTTPStatus.badRequest, e.msg);
+		} catch (UUIDParsingException e) {
 			throw new HTTPStatusException(HTTPStatus.badRequest, e.msg);
 		}
 	}

@@ -280,7 +280,7 @@ struct FixedAppender(ArrayType : E[], size_t NELEM, E) {
 
 	void put(ArrayType arr)
 	{
-		m_data[m_fill .. m_fill+arr.length] = (cast(ElemType[])arr)[];
+		m_data[m_fill .. m_fill+arr.length] = arr[];
 		m_fill += arr.length;
 	}
 
@@ -719,8 +719,7 @@ struct ArraySet(Key)
 	ref allocator()
 	nothrow @trusted {
 		try {
-			static if (__VERSION__ < 2074) auto palloc = m_allocator.parent;
-			else auto palloc = m_allocator._parent;
+			auto palloc = m_allocator._parent;
 			if (!palloc) {
 				assert(vibeThreadAllocator !is null, "No theAllocator set!?");
 				m_allocator = AllocatorType(AW(vibeThreadAllocator));

@@ -4,7 +4,8 @@ homepage "http://vibed.org/"
 
 license "MIT"
 copyright "Copyright © 2012-2018 rejectedsoftware e.K."
-authors "Sönke Ludwig" "Jan Krüger" "Matthias Dondorff" "see github for more"
+authors "Sönke Ludwig" "Mathias 'Geod24' Lang" "Etienne Cimon" "Martin Nowak" \
+	"Mihails 'Dicebot' Strasuns" "150 contributors total"
 
 systemDependencies "Optionally libevent 2.0.x, OpenSSL 1.0.x"
 dependency ":redis" version="*"
@@ -32,7 +33,8 @@ sourceFiles "source/vibe/d.d" "source/vibe/vibe.d"
 
 x:ddoxFilterArgs "--unittest-examples" "--min-protection=Protected"\
 	"--ex" "vibe.core.drivers." "--ex" "vibe.internal." "--ex" "vibe.web.internal."\
-	"--ex" "diet.internal" "--ex" "stdx." "--ex" "eventcore.internal." "--ex" "eventcore.drivers."
+	"--ex" "diet.internal" "--ex" "stdx." "--ex" "eventcore.internal." "--ex" "eventcore.drivers."\
+	"--ex" "mir."
 
 configuration "vibe-core" {
 	subConfiguration "vibe-d:core" "vibe-core"

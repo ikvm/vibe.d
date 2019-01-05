@@ -1,6 +1,115 @@
 ﻿Changelog
 =========
 
+v0.8.5 - 2018-
+-------------------
+
+### Features and improvements ###
+
+- Compiles on DMD 2.076.1 up to 2.082.0 and LDC 1.11.0
+- Added support for OpenSSL 1.1.1 (by Jan Jurzitza WebFreak001) - [issue #2214][issue2214], [pull #2226][issue2226]
+- `URL.port` now returns the value of `defaultPort`, if no explicit port was specified (by Szabo Bogdan aka gedaiu) - [pull #2176][issue2176]
+- Changed `Bson.opEquals` to yield true for objects with the same fields but different field order (by Igor Stepanov) - [pull #2183][issue2183]
+- Added an overload of `serveRestJSClient` that uses server-relative URIs (by Oleg B. aka deviator) - [issue #2222][issue2222], [pull #2223][issue2223]
+- `vibe.utils.hashmap.HashMap` now supports singleton allocators without an object wrapper - [pull #2236][issue2236]
+
+### Bug fixes ###
+
+- Fixed `RestInterfaceSettings.dup` to properly duplicate the `httpClientSettings` field (by Vitali Karabitski aka vitalka200)- [pull #2197][issue2197]
+- Fixed a compile error in `Bson.get!BsonRegex` (by Tuukka Kurtti aka Soletek) - [pull #2224][issue2224]
+- Fixed host name string conversion for `SyslogLogger` (by Tomáš Chaloupka) - [pull #2220][issue2220]
+- Fixed invalid ALPN string conversion in `OpenSSLStream` (by Francesco Galla) - [issue #2235][issue2235], [pull #2235][issue2235]
+
+[issue2214]: https://github.com/vibe-d/vibe.d/issues/2214
+[issue2226]: https://github.com/vibe-d/vibe.d/issues/2226
+[issue2176]: https://github.com/vibe-d/vibe.d/issues/2176
+[issue2183]: https://github.com/vibe-d/vibe.d/issues/2183
+[issue2222]: https://github.com/vibe-d/vibe.d/issues/2222
+[issue2223]: https://github.com/vibe-d/vibe.d/issues/2223
+[issue2197]: https://github.com/vibe-d/vibe.d/issues/2197
+[issue2224]: https://github.com/vibe-d/vibe.d/issues/2224
+[issue2220]: https://github.com/vibe-d/vibe.d/issues/2220
+[issue2235]: https://github.com/vibe-d/vibe.d/issues/2235
+[issue2235]: https://github.com/vibe-d/vibe.d/issues/2235
+[issue2236]: https://github.com/vibe-d/vibe.d/issues/2236
+
+
+v0.8.4 - 2018-06-02
+-------------------
+
+Small release with official support for DMD 2.080.0 and LDC 1.9.0, which contains a number of fixes and improvements. 
+
+### Features and improvements ###
+
+- Compiles on DMD DMD 2.074.1 up to 2.080.0 and LDC 1.9.0
+- Added `RestInterfaceClient.requestBodyFilter` to be able to add request headers based on the body contents - [pull #2136][issue2136]
+- Added an optional `status` parameter to `vibe.web.web.redirect` (by Sebastian Wilzbach) - [pull #1948][issue1948]
+- Added support for `string` return values as body contents for the web interface generator (by Sebastian Wilzbach) - [pull #1854][issue1854]
+- Added full support for Redis URLs (by Sebastian Wilzbach) - [pull #1842][issue1842]
+- Added `RedisZSet.rangeByLex` and `.countByLex` (by Geoffrey-A) - [pull #2141][issue2141]
+- Added `MongoClientSettings.maxConnections` (by Denis Feklushkin aka denizzzka) - [pull #2145][issue2145]
+- Added handling of `UUID` values in the JSON serializer (serialized as string) (by Benjamin Schaaf) - [pull #2088][issue2088], [pull #2158][issue2158]
+- Added `FixedRingBuffer.putFront` - [pull #2114][issue2114]
+- Added support for `UUID` parameters in the REST interface generator (by Tomáš Chaloupka) - [pull #2162][issue2162]
+- Added support for `UUID` BSON serialization (by Tomáš Chaloupka) - [issue #2161][issue2161], [pull #2163][issue2163]
+- The JSON serializer now ignores object fields with undefined values (by Szabo Bogdan aka gedaiu) - [pull #2149][issue2149]
+- Empty request bodies are now handled gracefully when accessing `req.json` (by Sebastian Wilzbach) - [pull #2042][issue2042]
+- Eliminated a few GC allocations and redundant operations (by Boris Barboris) - [pull #2135][issue2135], [pull #2138][issue2138]
+- On Linux, uses the `getrandom` syscall instead of /dev/urandom, if possible (by Nathan Sashihara aka n8sh) - [pull #2093][issue2093]
+- Uses `secure_arc4random` on Android (by Nathan Sashihara aka n8sh) - [pull #2113][issue2113]
+
+### Bug fixes ###
+
+- Fixed serialization of single-element tuples - [issue #2110][issue2110], [pull #2111][issue2111]
+- Fixed closing of non-keepalive HTTP client connections, if set from the response callback - [pull #2112][issue2112]
+- Fixed handling of enum types with base type `string` in the web interface generator (by Thibaut Charles) - [pull #2100][issue2100]
+- Fixed handling of regular TLS stream remote shutdown in `OpenSSLStream.leastSize` and `.empty` - [pull #2117][issue2117]
+- Fixed TLS peer certificate validation failures for certain certificates (by Márcio Martins) - [pull #2121][issue2121]
+- Fixed delayed connection close in `OpenSSLStream` and `HTTPClient` - [064ddd66][commit064ddd66], [064ddd66][commite3a0d3a1]
+- Fixed a range violation error in the Markdown parser for table rows with more column separators than table columns (by Jan Jurzitza WebFreak001) - [issue #2132][issue2132], [pull #2133][issue2133]
+- Fixed `Path.bySegment` (the legacy implementation in `vibe-d:core`) to insert an empty segment for absolute Posix paths, like `vibe-core` does - [pull #2143][issue2143]
+- Fixed JSON serialization of non-immutable and wide character strings - [issue #2150][issue2150], [pull #2151][issue2151]
+- Fixed bogus "mailto" links generated by the Markdown parser - [pull #2165][issue2165]
+- Fixed handling of Digest auth headers with equal signs occurring in a field value (by Geoffrey-A) - [issue #2023][issue2023], [pull #2059][issue2059]
+- Fixed behavior for buggy HTTP/1 servers that advertize keep-alive without a content length (by Tomáš Chaloupka) - [pull #2167][issue2167]
+
+[commit064ddd66]: https://github.com/vibe-d/vibe.d/commit/064ddd6638cae017c6882f6ae0067a2dc10cc6c3
+[commite3a0d3a1]: https://github.com/vibe-d/vibe.d/commit/e3a0d3a18ff91d7b6e1ff7300a5c039cf7d0bb45
+[issue1842]: https://github.com/vibe-d/vibe.d/issues/1842
+[issue1854]: https://github.com/vibe-d/vibe.d/issues/1854
+[issue1948]: https://github.com/vibe-d/vibe.d/issues/1948
+[issue2023]: https://github.com/vibe-d/vibe.d/issues/2023
+[issue2042]: https://github.com/vibe-d/vibe.d/issues/2042
+[issue2059]: https://github.com/vibe-d/vibe.d/issues/2059
+[issue2088]: https://github.com/vibe-d/vibe.d/issues/2088
+[issue2093]: https://github.com/vibe-d/vibe.d/issues/2093
+[issue2100]: https://github.com/vibe-d/vibe.d/issues/2100
+[issue2110]: https://github.com/vibe-d/vibe.d/issues/2110
+[issue2111]: https://github.com/vibe-d/vibe.d/issues/2111
+[issue2112]: https://github.com/vibe-d/vibe.d/issues/2112
+[issue2113]: https://github.com/vibe-d/vibe.d/issues/2113
+[issue2114]: https://github.com/vibe-d/vibe.d/issues/2114
+[issue2117]: https://github.com/vibe-d/vibe.d/issues/2117
+[issue2121]: https://github.com/vibe-d/vibe.d/issues/2121
+[issue2132]: https://github.com/vibe-d/vibe.d/issues/2132
+[issue2133]: https://github.com/vibe-d/vibe.d/issues/2133
+[issue2135]: https://github.com/vibe-d/vibe.d/issues/2135
+[issue2136]: https://github.com/vibe-d/vibe.d/issues/2136
+[issue2138]: https://github.com/vibe-d/vibe.d/issues/2138
+[issue2141]: https://github.com/vibe-d/vibe.d/issues/2141
+[issue2143]: https://github.com/vibe-d/vibe.d/issues/2143
+[issue2145]: https://github.com/vibe-d/vibe.d/issues/2145
+[issue2149]: https://github.com/vibe-d/vibe.d/issues/2149
+[issue2150]: https://github.com/vibe-d/vibe.d/issues/2150
+[issue2151]: https://github.com/vibe-d/vibe.d/issues/2151
+[issue2158]: https://github.com/vibe-d/vibe.d/issues/2158
+[issue2161]: https://github.com/vibe-d/vibe.d/issues/2161
+[issue2162]: https://github.com/vibe-d/vibe.d/issues/2162
+[issue2163]: https://github.com/vibe-d/vibe.d/issues/2163
+[issue2165]: https://github.com/vibe-d/vibe.d/issues/2165
+[issue2167]: https://github.com/vibe-d/vibe.d/issues/2167
+
+
 v0.8.3 - 2018-03-08
 -------------------
 

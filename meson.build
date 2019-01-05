@@ -2,11 +2,11 @@ project('Vibe.d', 'd',
     meson_version: '>=0.40',
     subproject_dir: 'lib/subprojects',
     license: 'MIT',
-    version: '0.8.4'
+    version: '0.8.5'
 )
 
 project_soversion      = '0'
-project_version_suffix = '~alpha1'
+project_version_suffix = '~alpha2'
 project_version        = meson.project_version()
 project_version_full   = project_version + project_version_suffix
 
@@ -58,7 +58,7 @@ endif
 # we need to search for this dependency after setting global compiler flags, because
 # it may pull in a subproject after which setting global flags is not allowed anymore
 diet_dep = dependency('diet', fallback: ['diet', 'diet_dep'])
-allocator_dep = subproject('allocator').get_variable('allocator_dep')
+allocator_dep = dependency('stdx-allocator', fallback: ['stdx-allocator', 'allocator_dep'])
 
 # directory where the external dependencies are included from.
 # Meson will search for this dir in both build_root and source_root

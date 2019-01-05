@@ -81,6 +81,7 @@ import std.range;
 import std.string;
 import std.traits;
 import std.typecons : Tuple;
+import std.uuid;
 
 /******************************************************************************/
 /* public types                                                               */
@@ -202,6 +203,9 @@ struct Json {
 	/// ditto
 	this(Json[string] v) @trusted { m_type = Type.object; m_object = v; }
 
+	// used internally for UUID serialization support
+	private this(UUID v) { this(v.toString()); }
+
 	/**
 		Converts a std.json.JSONValue object to a vibe Json object.
 	 */
@@ -296,6 +300,9 @@ struct Json {
 		version (VibeJsonFieldNames) { foreach (key, ref av; m_object) av.m_name = format("%s.%s", m_name, key); }
 		return v;
 	}
+
+	// used internally for UUID serialization support
+	private UUID opAssign(UUID v) { opAssign(v.toString()); return v; }
 
 	/**
 		Allows removal of values from Type.Object Json objects.
@@ -611,6 +618,7 @@ struct Json {
 		else static if (is(T == double)) return m_float;
 		else static if (is(T == float)) return cast(T)m_float;
 		else static if (is(T == string)) return m_string;
+		else static if (is(T == UUID)) return UUID(m_string);
 		else static if (is(T == Json[])) return m_array;
 		else static if (is(T == Json[string])) return m_object;
 		else static if (is(T == BigInt)) return m_type == Type.bigInt ? m_bigInt : BigInt(m_int);
@@ -1067,6 +1075,7 @@ struct Json {
 		else static if( is(T == float) ) return Type.float_;
 		else static if( is(T : long) ) return Type.int_;
 		else static if( is(T == string) ) return Type.string;
+		else static if( is(T == UUID) ) return Type.string;
 		else static if( is(T == Json[]) ) return Type.array;
 		else static if( is(T == Json[string]) ) return Type.object;
 		else static if( is(T == BigInt) ) return Type.bigInt;
@@ -1715,13 +1724,34 @@ unittest { // issue #1660 - deserialize AA whose key type is string-based enum
 	assert(deserializeJson!S(j).f == [Foo.Bar: 2000]);
 }
 
+unittest {
+	struct V {
+		UUID v;
+	}
+
+	const u = UUID("318d7a61-e41b-494e-90d3-0a99f5531bfe");
+	const s = `{"v":"318d7a61-e41b-494e-90d3-0a99f5531bfe"}`;
+	auto j = Json(["v": Json(u)]);
+
+	const v = V(u);
+
+	assert(serializeToJson(v) == j);
+
+	j = Json.emptyObject;
+	j["v"] = u;
+	assert(deserializeJson!V(j).v == u);
+
+	assert(serializeToJsonString(v) == s);
+	assert(deserializeJson!V(s).v == u);
+}
+
 /**
 	Serializer for a plain Json representation.
 
 	See_Also: vibe.data.serialization.serialize, vibe.data.serialization.deserialize, serializeToJson, deserializeJson
 */
 struct JsonSerializer {
-	template isJsonBasicType(T) { enum isJsonBasicType = std.traits.isNumeric!T || isBoolean!T || is(T == string) || is(T == typeof(null)) || isJsonSerializable!T; }
+	template isJsonBasicType(T) { enum isJsonBasicType = std.traits.isNumeric!T || isBoolean!T || isSomeString!T || is(T == typeof(null)) || is(T == UUID) || isJsonSerializable!T; }
 
 	template isSupportedValueType(T) { enum isSupportedValueType = isJsonBasicType!T || is(T == Json) || is (T == JSONValue); }
 
@@ -1757,6 +1787,8 @@ struct JsonSerializer {
 			static if (!__traits(compiles, () @safe { return value.toJson(); } ()))
 				pragma(msg, "Non-@safe toJson/fromJson methods are deprecated - annotate "~T.stringof~".toJson() with @safe.");
 			m_current = () @trusted { return value.toJson(); } ();
+		} else static if (isSomeString!T && !is(T == string)) {
+			writeValue!Traits(value.to!string);
 		} else m_current = Json(value);
 	}
 
@@ -1771,6 +1803,10 @@ struct JsonSerializer {
 		enforceJson(m_current.type == Json.Type.object, "Expected JSON object, got "~m_current.type.to!string);
 		auto old = m_current;
 		foreach (string key, value; m_current.get!(Json[string])) {
+			if (value.type == Json.Type.undefined) {
+				continue;
+			}
+
 			m_current = value;
 			field_handler(key);
 		}
@@ -1811,15 +1847,34 @@ struct JsonSerializer {
 				case Json.Type.float_: return cast(T)m_current.get!double;
 				case Json.Type.bigInt: return cast(T)m_current.bigIntToLong();
 			}
-		}
-		else {
-			return m_current.get!T();
-		}
+		} else static if (is(T == const(char)[])) {
+			return readValue!(Traits, string);
+		} else static if (isSomeString!T && !is(T == string)) {
+			return readValue!(Traits, string).to!T;
+		} else static if (is(T == string)) {
+			if (m_current.type == Json.Type.array) { // legacy support for pre-#2150 serialization results
+				return () @trusted { // appender
+					auto r = appender!string;
+					foreach (s; m_current.get!(Json[]))
+						r.put(s.get!string());
+					return r.data;
+				} ();
+			} else return m_current.get!T();
+		} else return m_current.get!T();
 	}
 
 	bool tryReadNull(Traits)() { return m_current.type == Json.Type.null_; }
 }
 
+unittest {
+	struct T {
+		@optional string a;
+	}
+
+	auto obj = Json.emptyObject;
+	obj["a"] = Json.undefined;
+	assert(obj.deserializeJson!T.a == "");
+}
 
 /**
 	Serializer for a range based plain JSON string representation.
@@ -1834,7 +1889,7 @@ struct JsonStringSerializer(R, bool pretty = false)
 		size_t m_level = 0;
 	}
 
-	template isJsonBasicType(T) { enum isJsonBasicType = std.traits.isNumeric!T || isBoolean!T || is(T == string) || is(T == typeof(null)) || isJsonSerializable!T; }
+	template isJsonBasicType(T) { enum isJsonBasicType = std.traits.isNumeric!T || isBoolean!T || isSomeString!T || is(T == typeof(null)) || is(T == UUID) || isJsonSerializable!T; }
 
 	template isSupportedValueType(T) { enum isSupportedValueType = isJsonBasicType!T || is(T == Json) || is(T == JSONValue); }
 
@@ -1879,11 +1934,12 @@ struct JsonStringSerializer(R, bool pretty = false)
 			else static if (is(T : long)) m_range.formattedWrite("%s", value);
 			else static if (is(T == BigInt)) () @trusted { m_range.formattedWrite("%d", value); } ();
 			else static if (is(T : real)) value == value ? m_range.formattedWrite("%.16g", value) : m_range.put("null");
-			else static if (is(T == string)) {
+			else static if (is(T : const(char)[])) {
 				m_range.put('"');
 				m_range.jsonEscape(value);
 				m_range.put('"');
-			}
+			} else static if (isSomeString!T) writeValue!Traits(value.to!string); // TODO: avoid memory allocation
+			else static if (is(T == UUID)) writeValue!Traits(value.toString());
 			else static if (is(T == Json)) m_range.writeJsonString(value);
 			else static if (is(T == JSONValue)) m_range.writeJsonString(Json(value));
 			else static if (isJsonSerializable!T) {
@@ -2019,7 +2075,19 @@ struct JsonStringSerializer(R, bool pretty = false)
 				auto num = m_range.skipNumber(is_float, is_long_overflow);
 				return to!T(num);
 			}
-			else static if (is(T == string)) return m_range.skipJsonString(&m_line);
+			else static if (is(T == string) || is(T == const(char)[])) {
+				if (!m_range.empty && m_range.front == '[') {
+					return () @trusted { // appender
+						auto ret = appender!string();
+						readArray!Traits((sz) {}, () @trusted {
+							ret.put(m_range.skipJsonString(&m_line));
+						});
+						return ret.data;
+					} ();
+				} else return m_range.skipJsonString(&m_line);
+			}
+			else static if (isSomeString!T) return readValue!(Traits, string).to!T;
+			else static if (is(T == UUID)) return UUID(readValue!(Traits, string)());
 			else static if (is(T == Json)) return m_range.parseJson(&m_line);
 			else static if (is(T == JSONValue)) return cast(JSONValue)m_range.parseJson(&m_line);
 			else static if (isJsonSerializable!T) {
@@ -2236,7 +2304,7 @@ string convertJsonToASCII(string json)
 
 
 /// private
-private void jsonEscape(bool escape_unicode = false, R)(ref R dst, string s)
+private void jsonEscape(bool escape_unicode = false, R)(ref R dst, const(char)[] s)
 {
 	size_t startPos = 0;
 
@@ -2511,12 +2579,14 @@ package template isJsonSerializable(T) { enum isJsonSerializable = is(typeof(T.i
 
 private void enforceJson(string file = __FILE__, size_t line = __LINE__)(bool cond, lazy string message = "JSON exception")
 {
-	enforceEx!JSONException(cond, message, file, line);
+	import vibe.internal.exception : enforce;
+	enforce!JSONException(cond, message, file, line);
 }
 
 private void enforceJson(string file = __FILE__, size_t line = __LINE__)(bool cond, lazy string message, string err_file, int err_line)
 {
-	enforceEx!JSONException(cond, format("%s(%s): Error: %s", err_file, err_line+1, message), file, line);
+	import vibe.internal.exception : enforce;
+	enforce!JSONException(cond, format("%s(%s): Error: %s", err_file, err_line+1, message), file, line);
 }
 
 private void enforceJson(string file = __FILE__, size_t line = __LINE__)(bool cond, lazy string message, string err_file, int* err_line)
@@ -2622,4 +2692,27 @@ private auto trustedRange(R)(R range)
 	import std.conv : to;
 	assert(a.to!JSONValue.to!Json == a);
 	assert(to!Json(to!JSONValue(a)) == a);
+}
+
+@safe unittest { // issue #2150 - serialization of const/mutable strings + wide character strings
+	assert(serializeToJson(cast(const(char)[])"foo") == Json("foo"));
+	assert(serializeToJson("foo".dup) == Json("foo"));
+	assert(deserializeJson!string(Json("foo")) == "foo");
+	assert(deserializeJson!string(Json([Json("f"), Json("o"), Json("o")])) == "foo");
+	assert(serializeToJsonString(cast(const(char)[])"foo") == "\"foo\"");
+	assert(deserializeJson!string("\"foo\"") == "foo");
+
+	assert(serializeToJson(cast(const(wchar)[])"foo"w) == Json("foo"));
+	assert(serializeToJson("foo"w.dup) == Json("foo"));
+	assert(deserializeJson!wstring(Json("foo")) == "foo");
+	assert(deserializeJson!wstring(Json([Json("f"), Json("o"), Json("o")])) == "foo");
+	assert(serializeToJsonString(cast(const(wchar)[])"foo"w) == "\"foo\"");
+	assert(deserializeJson!wstring("\"foo\"") == "foo");
+
+	assert(serializeToJson(cast(const(dchar)[])"foo"d) == Json("foo"));
+	assert(serializeToJson("foo"d.dup) == Json("foo"));
+	assert(deserializeJson!dstring(Json("foo")) == "foo");
+	assert(deserializeJson!dstring(Json([Json("f"), Json("o"), Json("o")])) == "foo");
+	assert(serializeToJsonString(cast(const(dchar)[])"foo"d) == "\"foo\"");
+	assert(deserializeJson!dstring("\"foo\"") == "foo");
 }
